@@ -35,13 +35,6 @@ export const BridgeAndJobNotifications = props => {
               Job <Link to={`/job_specs/${success.id}`}>{success.id}</Link> was successfully created
             </Fragment>
           )},
-          {jobOrBridge === 'JobSpecRun' && (
-            <Fragment>
-              Spec <Link to={`/job_specs/${success.id}`}>{success.id}</Link> was run
-            </Fragment>
-          )
-
-          }
         </Flash>
       )}
     </Fragment>

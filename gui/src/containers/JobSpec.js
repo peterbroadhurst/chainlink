@@ -16,10 +16,13 @@ import matchRouteAndMapDispatchToProps from 'utils/matchRouteAndMapDispatchToPro
 import { withStyles } from '@material-ui/core/styles'
 import { connect } from 'react-redux'
 import { fetchJobSpec, submitJobSpecRun } from 'actions'
-import { jobSpecSelector, jobRunsSelector, jobRunsCountSelector } from 'selectors'
+import {
+  jobSpecSelector,
+  jobRunsSelector,
+  jobRunsCountSelector
+} from 'selectors'
 import { LATEST_JOB_RUNS_COUNT } from 'connectors/redux/reducers/jobRuns'
 import { Divider, Button } from '@material-ui/core'
-import { BridgeAndJobNotifications } from 'components/FormNotifications'
 
 const styles = theme => ({
   title: {
@@ -46,27 +49,18 @@ const styles = theme => ({
     marginTop: theme.spacing.unit * 3,
     marginLeft: theme.spacing.unit * 3,
     display: 'block'
-  },
-  flash: {
-    textAlign: 'center',
-    paddingTop: theme.spacing.unit,
-    paddingBottom: theme.spacing.unit
   }
 })
 
-const renderJobSpec = ({ classes, jobSpec, jobRunsCount, success, submitJobSpecRun }) => {
-  const handleClick = () => { submitJobSpecRun(jobSpec.id) }
+const renderJobSpec = ({ classes, jobSpec, jobRunsCount, submitJobSpecRun, fetching, fetchJobSpec }) => {
+  const handleClick = () => {
+    submitJobSpecRun(jobSpec.id).then(() => fetchJobSpec(jobSpec.id))
+  }
 
   return (
     <Grid container spacing={40}>
       <Grid item xs={8}>
         <PaddedCard>
-          <BridgeAndJobNotifications
-            success={success}
-            error={{}}
-            authenticated
-            classes={classes}
-          />
           <Grid container alignItems='baseline'>
             <Grid item xs={8}>
               <Typography variant='title' className={classes.definitionTitle}>
@@ -75,7 +69,7 @@ const renderJobSpec = ({ classes, jobSpec, jobRunsCount, success, submitJobSpecR
             </Grid>
             <Grid item>
               {isWebInitiator(jobSpec.initiators) && (
-                <Button variant='outlined' color='primary' onClick={handleClick}>
+                <Button variant='outlined' color='primary' disabled={fetching} onClick={handleClick}>
                   Run
                 </Button>
               )}
@@ -94,17 +88,13 @@ const renderJobSpec = ({ classes, jobSpec, jobRunsCount, success, submitJobSpecR
         <PaddedCard>
           <Grid container spacing={16}>
             <Grid item xs={12}>
-              <Typography variant='subheading' color='textSecondary'>
-                ID
-              </Typography>
+              <Typography variant='subheading' color='textSecondary'>ID</Typography>
               <Typography variant='body1' color='inherit'>
                 {jobSpec.id}
               </Typography>
             </Grid>
             <Grid item xs={12}>
-              <Typography variant='subheading' color='textSecondary'>
-                Created
-              </Typography>
+              <Typography variant='subheading' color='textSecondary'>Created</Typography>
               <Typography variant='body1' color='inherit'>
                 {jobSpec.createdAt}
               </Typography>
@@ -112,17 +102,13 @@ const renderJobSpec = ({ classes, jobSpec, jobRunsCount, success, submitJobSpecR
             <Grid item xs={12}>
               <Grid container spacing={16}>
                 <Grid item xs={6}>
-                  <Typography variant='subheading' color='textSecondary'>
-                    Initiator
-                  </Typography>
+                  <Typography variant='subheading' color='textSecondary'>Initiator</Typography>
                   <Typography variant='body1' color='inherit'>
                     {formatInitiators(jobSpec.initiators)}
                   </Typography>
                 </Grid>
                 <Grid item xs={6}>
-                  <Typography variant='subheading' color='textSecondary'>
-                    Run Count
-                  </Typography>
+                  <Typography variant='subheading' color='textSecondary'>Run Count</Typography>
                   <Typography variant='body1' color='inherit'>
                     {jobRunsCount}
                   </Typography>
@@ -210,13 +196,15 @@ const mapStateToProps = (state, ownProps) => {
   const jobRunsCount = jobRunsCountSelector(state, jobSpecId)
   const latestJobRuns = jobRunsSelector(state)
   const success = state.create.successMessage
+  const fetching = state.fetching.count
 
   return {
     jobSpecId,
     jobSpec,
     latestJobRuns,
     jobRunsCount,
-    success
+    success,
+    fetching
   }
 }
 
