@@ -1,6 +1,11 @@
 import { deploy, checkPublicABI, bigNum } from './support/helpers'
 import { assertBigNum } from './support/matchers'
 
+function zeroPad(num, places) {
+  var zero = places - num.toString().length + 1;
+  return Array(+(zero > 0 && zero)).join("0") + num;
+}
+
 contract('Coordinator', () => {
   const sourcePath = 'Coordinator.sol'
   let coordinator
@@ -31,19 +36,158 @@ contract('Coordinator', () => {
 
   describe('#initiateServiceAgreement', () => {
     it('saves a service agreement struct from the parameters', async () => {
-      let oracles = [
-        '0x9CA9d2D5E04012C9Ed24C0e513C9bfAa4A2dD77f',
-      ]
-      //let signatures = [
-        //'0x65d773d0c12657bdd9a136e8d21116d7816de4dcc3c8f00be783fac6d7670603274b45cdf310fd9f249d13f0020a551e520fbe5c9fad34ae607b8f673a54789b00'
-        // '0xb7'
-      //]
-      let vs = ['0xb7']
-      let rs = ['0xa987222fc36c4c8ed1b91264867a422769998aadbeeb1c697586a04fa2b61602']
-      let ss = ['0x5b5ca936ec5bdb150999e298b6ecf09251d3c4dd1306dedec0692e7037584800']
-      let requestDigest = '0x126b1bc415a0fea64618d500d36ea390230fc9ea82f217d8f06c80ae024d19ba' // SAID
-      await coordinator.initiateServiceAgreement(1, 2, oracles, vs, rs, ss, requestDigest)
+      const account = web3.eth.accounts[0]
 
+      // let said = '0xbad5b00f4179c750e8431f4b62c00ab2e633a9c4eefb6dd5d668a545eccfe1e8'
+      // --SAID from truffle-develop
+      // '0xaca2e98f692cd2a34a4bcf313efd53ba2700f902acd71fa4575ae7ba3798a188'
+      // --END SAID from truffle-develop
+      // let signatures = [
+      // '0x65d773d0c12657bdd9a136e8d21116d7816de4dcc3c8f00be783fac6d7670603274b45cdf310fd9f249d13f0020a551e520fbe5c9fad34ae607b8f673a54789b00'
+      // '0xb7'
+      // ]
+      // let vs = ['0xb7']
+      // let rs = ['0xa987222fc36c4c8ed1b91264867a422769998aadbeeb1c697586a04fa2b61602']
+      // let ss = ['0x5b5ca936ec5bdb150999e298b6ecf09251d3c4dd1306dedec0692e7037584800']
+      // let signature = '0x0056c2cdbfde646750473535fa899b42d0d7bc42d25e7096298c43239ba1e40f3299ceec87ff5f432b3690f7cfa90dbd24e4e750e0dbcb74244a0b35da848e8700'.slice(2)
+
+      const msg = OrigBuffer.from('hello world')
+      const hexMsg = '0x' + msg.toString('hex')
+      let signature = web3.eth.sign(account, hexMsg)
+      const res = utils.fromRpcSig(signature)
+
+      console.log('account: %o', account)
+      console.log('msg: %o', msg.toString())
+      console.log('msg buff: %o', msg)
+      console.log('msg buffer length: %o', msg.length)
+      console.log('hexMsg: %o', hexMsg)
+      console.log('hexMsg.length: %o', hexMsg.length)
+      console.log('signature: %o', signature)
+      console.log('res: %o', res)
+      console.log('res.r: %o', res.r.toString('hex'))
+      console.log('res.s: %o', res.s.toString('hex'))
+
+      const prefix = new OrigBuffer('\x19Ethereum Signed Message:\n')
+      const prefixedMsg = utils.sha3(
+        Buffer.concat([prefix, new OrigBuffer(String(msg.length)), msg])
+      )
+
+      console.log('prefixed msg: %o', prefixedMsg)
+
+      const pubKey = utils.ecrecover(prefixedMsg, res.v, res.r, res.s)
+      const addrBuf = utils.pubToAddress(pubKey)
+      const addr = utils.bufferToHex(addrBuf)
+
+      console.log('== COMPARE "hello world" signatures [%o] = [%o]', account, addr)
+      // TODO: Delete this assertion once it's using the requestId
+      assert.equal(account, addr)
+
+      // =============================================================== USING REAL VALUES INSTEAD OF 'hello world'
+      console.log('\n\n\n')
+      // const foo = OrigBuffer.from('85820c5ec619a1f517ee6cfeff545ec0ca1a90206e1a38c47f016d4137e801dd')
+      // const requestDigest = '0x85820c5ec619a1f517ee6cfeff545ec0ca1a90206e1a38c47f016d4137e801dd'
+      // const foo = OrigBuffer.from('126b1bc415a0fea64618d500d36ea390230fc9ea82f217d8f06c80ae024d19ba')
+      // const requestDigest = '0x126b1bc415a0fea64618d500d36ea390230fc9ea82f217d8f06c80ae024d19ba'
+      // ---
+      // const s = '{' +
+      // '"payment":"1000000000000000000",' +
+      // '"expiration":300,' +
+      // '"oracles":["0x9CA9d2D5E04012C9Ed24C0e513C9bfAa4A2dD77f"]' +
+      // '}'
+      // const e = '0xDE0B6B3A76400000xabc'
+      // const j = '{' +
+      //   '"initiators":[{"type":"web"}],' +
+      //   '"tasks":[' +
+      //     '{"type":"HttpGet","url":"https://bitstamp.net/api/ticker/"},' +
+      //     '{"path :["last"],"type":"JsonParse"},' +
+      //     '{"type":"EthBytes32"},' +
+      //     '{"address":"0x356a04bce728ba4c62a30294a55e6a8600a320b3","functionSelector":"0x609ff1bd","type":"EthTx"}' +
+      //   ']' +
+      // '}'
+
+      const payment              = bigNum('1000000000000000000')
+      const paymentStr           = zeroPad(payment.toString(16, 64), 64) // FIXME: length doesn't work?
+      console.log('paymentStr', paymentStr)
+
+      const expiration           = bigNum('300')
+      const expirationStr        = zeroPad(expiration.toString(16, 64), 64)
+      console.log('expirationStr', expirationStr)
+
+      const encumberance         = paymentStr + expirationStr
+
+      let oracles = [bigNum(account)]
+      console.log('account', account, 'oracles', oracles)
+      const oraclesStr = oracles.map(o => zeroPad(o.toString(16, 40), 40)).join('')
+      console.log('oraclesStr', oraclesStr)
+
+      const normalizedJsonDigest = '9ebed6ae16d275059bf4de0e01482b0eca7ffc0ffcc1918db61e17ac0f7dedc8'
+
+      const saidInput = encumberance + oraclesStr + normalizedJsonDigest
+      console.log('said Input', saidInput)
+      const saidStr = web3.sha3(saidInput)
+      console.log('SAID: %o', saidStr)
+      const said = OrigBuffer.from('0x' + saidStr.toString('hex'))
+
+      // const normalizedJson = '{' +
+      // '"expiration":3.000000e+02,' +
+      // '"initiators":[{"type":"web"}],' +
+      // '"oracles":["0x9CA9d2D5E04012C9Ed24C0e513C9bfAa4A2dD77f"],' +
+      // '"payment":"1000000000000000000",' +
+      // '"tasks":[' +
+      // '{"type":"HttpGet","url":"https://bitstamp.net/api/ticker/"},' +
+      // '{"path":["last"],"type":"JsonParse"},' +
+      // '{"type":"EthBytes32"},' +
+      // '{"address":"0x356a04bce728ba4c62a30294a55e6a8600a320b3","functionSelector":"0x609ff1bd","type":"EthTx"}' +
+      // ']' +
+      // '}'
+
+      const saidBuffer = OrigBuffer.from(said)
+      const saidBufferHex = '0x' + saidBuffer.toString('hex')
+      // ---
+      let requestDigestSignature = web3.eth.sign(account, saidBufferHex)
+      console.log('requestDigestSignature: %o', requestDigestSignature)
+
+      const requestDigestRes = utils.fromRpcSig(requestDigestSignature)
+      console.log('requestDigestRes: %o', requestDigestRes)
+      console.log('requestDigestRes.r: %o', requestDigestRes.r.toString('hex'))
+      console.log('requestDigestRes.s: %o', requestDigestRes.s.toString('hex'))
+
+      const requestDigestPrefix = new OrigBuffer('\x19Ethereum Signed Message:\n')
+      const requestDigestPrefixedMsg = utils.sha3(
+        // TODO: Need to figure out what we should use instead of msg here
+        // Buffer.concat([requestDigestPrefix, new OrigBuffer(String(msg.length)), msg])
+        Buffer.concat([requestDigestPrefix, new OrigBuffer(String(saidBuffer.length)), said])
+      )
+
+      console.log('requestDigestPrefixedMsg: %o', requestDigestPrefixedMsg)
+
+      const requestDigestPubKey = utils.ecrecover(requestDigestPrefixedMsg, requestDigestRes.v, requestDigestRes.r, requestDigestRes.s)
+      const requestDigestAddrBuf = utils.pubToAddress(requestDigestPubKey)
+      const requestDigestAddr = utils.bufferToHex(requestDigestAddrBuf)
+
+      console.log('== COMPARE requestDigest signatures [%o] = [%o]', account, requestDigestAddr)
+      assert.equal(account, requestDigestAddr)
+
+      // let requestDigest = '0xd9eba16ed0ecae432b71fe008c98cc872bb4cc214d3220a36f365326cf807d68'
+      // let requestDigest = '0xbad5b00f4179c750e8431f4b62c00ab2e633a9c4eefb6dd5d668a545eccfe1e8'
+      // await coordinator.initiateServiceAgreement(1, 2, oracles, vs, rs, ss, requestDigest)
+      await coordinator.initiateServiceAgreement(
+        payment,
+        expiration,
+        oracles,
+        // vs,
+        // rs,
+        // ss,
+        // requestDigest
+        [res.v],
+        ['0x' + res.r.toString('hex')],
+        ['0x' + res.s.toString('hex')],
+        // msg.toString(),
+        new Uint8Array(saidBuffer),
+        normalizedJsonDigest
+      )
+
+      // NOTE: This id will change when it's using the requestId
       let sa = await coordinator.serviceAgreements.call(
         '0x2249a9e0a0463724551b2980299a16406da6f4e80d911628ee77445be4e04e7c'
       )
