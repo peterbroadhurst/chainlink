@@ -69,7 +69,7 @@ const renderJobSpec = ({ classes, jobSpec, jobRunsCount, submitJobSpecRun, fetch
             </Grid>
             <Grid item>
               {isWebInitiator(jobSpec.initiators) && (
-                <Button variant='outlined' color='primary' disabled={fetching} onClick={handleClick}>
+                <Button variant='outlined' color='primary' disabled={!!fetching} onClick={handleClick}>
                   Run
                 </Button>
               )}
