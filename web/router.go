@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink/logger"
 	"github.com/smartcontractkit/chainlink/services"
 	"github.com/smartcontractkit/chainlink/store"
+	"github.com/unrolled/secure"
 )
 
 const (
@@ -29,8 +30,34 @@ const (
 	SessionIDKey = "clsession_id"
 )
 
+// secureMiddleware Return an unrolled/secure middleware for beefing up
+// security and handling HTTP -> HTTPS redirection
+func secureMiddleware(dev bool) gin.HandlerFunc {
+	secureMiddleware := secure.New(secure.Options{
+		IsDevelopment: dev,
+	})
+
+	return func() gin.HandlerFunc {
+		return func(c *gin.Context) {
+			err := secureMiddleware.Process(c.Writer, c.Request)
+
+			// If there was an error, do not continue.
+			if err != nil {
+				c.Abort()
+				return
+			}
+
+			// Avoid header rewrite if response is a redirection.
+			if status := c.Writer.Status(); status > 300 && status < 399 {
+				c.Abort()
+			}
+		}
+	}()
+}
+
 // Router listens and responds to requests to the node for valid paths.
 func Router(app *services.ChainlinkApplication) *gin.Engine {
+
 	engine := gin.New()
 	config := app.Store.Config
 	secret, err := config.SessionSecret()
@@ -46,6 +73,7 @@ func Router(app *services.ChainlinkApplication) *gin.Engine {
 		gin.Recovery(),
 		cors,
 		sessions.Sessions(SessionName, sessionStore),
+		secureMiddleware(app.Store.Config.Dev),
 	)
 
 	sessionRoutes(app, engine)
